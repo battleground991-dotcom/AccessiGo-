@@ -1041,16 +1041,31 @@
                     </div>
                 </section>
                 
+                <!-- Voice Status -->
+                <section class="glass rounded-2xl p-4">
+                    <h2 class="font-bold mb-4">🔊 Voice Status</h2>
+                    <div id="voice-status-info" class="space-y-2 text-sm">
+                        <!-- Populated by JS -->
+                    </div>
+                    <button onclick="testVoice()" class="btn-press mt-3 w-full glass-gold rounded-xl py-3 font-medium flex items-center justify-center gap-2">
+                        <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.536 8.464a5 5 0 010 7.072m2.828-9.9a9 9 0 010 12.728M5.586 15H4a1 1 0 01-1-1v-4a1 1 0 011-1h1.586l4.707-4.707C10.923 3.663 12 4.109 12 5v14c0 .891-1.077 1.337-1.707.707L5.586 15z"/>
+                        </svg>
+                        Test Voice
+                    </button>
+                </section>
+                
                 <!-- About -->
                 <section class="glass rounded-2xl p-4">
                     <h2 class="font-bold mb-4" data-i18n="about">About</h2>
                     <div class="space-y-2 text-sm text-gray-400">
-                        <p class="text-yellow-400 font-bold">AccessiGo v2.0.0</p>
+                        <p class="text-yellow-400 font-bold">AccessiGo v2.1.0</p>
                         <p>Bengaluru Namma Metro Accessibility Companion</p>
                         <p>✨ Features:</p>
                         <ul class="list-disc list-inside ml-2 space-y-1">
                             <li>Purple, Green & Yellow Metro Lines</li>
                             <li>🎤 Multi-language Voice Assistant (6 languages)</li>
+                            <li>🔊 Google TTS for all Indian languages</li>
                             <li>🗺️ Interactive Maps with GPS</li>
                             <li>🚨 SOS Emergency System</li>
                             <li>♿ Staff Assistance Requests</li>
@@ -2296,6 +2311,17 @@
             state.currentLang = lang;
             saveState();
             applyLanguage();
+            
+            // Update voice recognition language
+            if (voiceRecognition) {
+                voiceRecognition.lang = getVoiceLang();
+            }
+            
+            // Update voice status display
+            updateVoiceStatusInfo();
+            
+            // Update voice commands help if modal is open
+            populateVoiceCommandsHelp();
         }
 
         function applyLanguage() {
@@ -2678,7 +2704,16 @@
         // VOICE & ASSISTANCE
         // ============================================
         function startVoiceGuidance() {
-            speak('Welcome to AccessiGo. Your accessible companion for Bengaluru Namma Metro.');
+            const welcomeTexts = {
+                en: 'Welcome to AccessiGo. Your accessible companion for Bengaluru Namma Metro.',
+                hi: 'एक्सेसीगो में आपका स्वागत है। बेंगलुरु नम्मा मेट्रो के लिए आपका सुलभ साथी।',
+                kn: 'ಎಕ್ಸೆಸಿಗೋಗೆ ಸ್ವಾಗತ. ಬೆಂಗಳೂರು ನಮ್ಮ ಮೆಟ್ರೋಗೆ ನಿಮ್ಮ ಪ್ರವೇಶಯೋಗ್ಯ ಸಹಚರ.',
+                ta: 'ஆக்செசிகோவுக்கு வரவேற்கிறோம். பெங்களூர் நம்ம மெட்ரோவுக்கான உங்கள் அணுகக்கூடிய துணை.',
+                te: 'యాక్సెసిగోకు స్వాగతం. బెంగళూరు నమ్మ మెట్రో కోసం మీ యాక్సెసిబుల్ సహచరుడు.',
+                ml: 'ആക്സസിഗോയിലേക്ക് സ്വാഗതം. ബെംഗളൂരു നമ്മ മെട്രോയ്ക്കുള്ള നിങ്ങളുടെ ആക്സസിബിൾ കൂട്ടാളി.'
+            };
+            
+            speak(welcomeTexts[state.currentLang] || welcomeTexts.en);
         }
 
         function readRouteAloud() {
@@ -2688,22 +2723,104 @@
             }
             
             const r = state.currentRoute;
-            let text = `Your route has ${r.stations.length} stations and takes about ${r.duration} minutes. `;
-            if (r.needsInterchange) text += 'You will need to change at Majestic. ';
-            text += `Starting from ${r.stations[0].name}, your destination is ${r.stations[r.stations.length - 1].name}.`;
+            const lang = state.currentLang;
             
-            speak(text);
+            // Generate route text in different languages
+            const routeTexts = {
+                en: () => {
+                    let text = `Your route has ${r.stations.length} stations and takes about ${r.duration} minutes. `;
+                    if (r.needsInterchange) text += 'You will need to change at Majestic. ';
+                    text += `Starting from ${r.stations[0].name}, your destination is ${r.stations[r.stations.length - 1].name}.`;
+                    return text;
+                },
+                hi: () => {
+                    let text = `आपके मार्ग में ${r.stations.length} स्टेशन हैं और इसमें लगभग ${r.duration} मिनट लगेंगे। `;
+                    if (r.needsInterchange) text += 'आपको मैजेस्टिक में ट्रेन बदलनी होगी। ';
+                    text += `${r.stations[0].name} से शुरू होकर, आपका गंतव्य ${r.stations[r.stations.length - 1].name} है।`;
+                    return text;
+                },
+                kn: () => {
+                    let text = `ನಿಮ್ಮ ಮಾರ್ಗದಲ್ಲಿ ${r.stations.length} ನಿಲ್ದಾಣಗಳಿವೆ ಮತ್ತು ಸುಮಾರು ${r.duration} ನಿಮಿಷಗಳು ಬೇಕಾಗುತ್ತದೆ। `;
+                    if (r.needsInterchange) text += 'ನೀವು ಮೆಜೆಸ್ಟಿಕ್‌ನಲ್ಲಿ ರೈಲು ಬದಲಾಯಿಸಬೇಕು। ';
+                    text += `${r.stations[0].name} ನಿಂದ ಪ್ರಾರಂಭಿಸಿ, ನಿಮ್ಮ ಗಮ್ಯಸ್ಥಾನ ${r.stations[r.stations.length - 1].name}.`;
+                    return text;
+                },
+                ta: () => {
+                    let text = `உங்கள் பாதையில் ${r.stations.length} நிலையங்கள் உள்ளன, சுமார் ${r.duration} நிமிடங்கள் ஆகும். `;
+                    if (r.needsInterchange) text += 'நீங்கள் மஜஸ்டிக்கில் ரயில் மாற்ற வேண்டும். ';
+                    text += `${r.stations[0].name} இல் தொடங்கி, உங்கள் இலக்கு ${r.stations[r.stations.length - 1].name}.`;
+                    return text;
+                },
+                te: () => {
+                    let text = `మీ మార్గంలో ${r.stations.length} స్టేషన్లు ఉన్నాయి, సుమారు ${r.duration} నిమిషాలు పడుతుంది. `;
+                    if (r.needsInterchange) text += 'మీరు మెజెస్టిక్ వద్ద రైలు మారాలి. ';
+                    text += `${r.stations[0].name} నుండి ప్రారంభించి, మీ గమ్యస్థానం ${r.stations[r.stations.length - 1].name}.`;
+                    return text;
+                },
+                ml: () => {
+                    let text = `നിങ്ങളുടെ വഴിയിൽ ${r.stations.length} സ്റ്റേഷനുകളുണ്ട്, ഏകദേശം ${r.duration} മിനിറ്റ് എടുക്കും. `;
+                    if (r.needsInterchange) text += 'നിങ്ങൾ മെജസ്റ്റിക്കിൽ ട്രെയിൻ മാറണം. ';
+                    text += `${r.stations[0].name} മുതൽ ആരംഭിച്ച്, നിങ്ങളുടെ ലക്ഷ്യസ്ഥാനം ${r.stations[r.stations.length - 1].name}.`;
+                    return text;
+                }
+            };
+            
+            const textGenerator = routeTexts[lang] || routeTexts.en;
+            speak(textGenerator());
         }
 
         function speak(text) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = 'en-IN';
-                utterance.rate = 0.9;
-                window.speechSynthesis.speak(utterance);
-                showToast('🔊 Speaking...', 'info');
-            }
+            const langCode = state.currentLang;
+            
+            // Language names for toast
+            const langNames = {
+                en: 'English',
+                hi: 'हिंदी',
+                kn: 'ಕನ್ನಡ',
+                ta: 'தமிழ்',
+                te: 'తెలుగు',
+                ml: 'മലയാളം'
+            };
+            
+            showToast(`🔊 Speaking in ${langNames[langCode]}...`, 'info');
+            
+            const onComplete = () => {
+                showToast('✓ Finished speaking', 'success');
+            };
+            
+            // Check if native voice is available
+            ensureVoicesLoaded().then(() => {
+                const hasNative = hasNativeVoice(langCode);
+                
+                if (hasNative) {
+                    // Use native Web Speech API
+                    window.speechSynthesis.cancel();
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = getVoiceLang();
+                    
+                    const voice = getBestVoice(langCode);
+                    if (voice) {
+                        utterance.voice = voice;
+                        console.log(`Voice Guidance using: ${voice.name} (${voice.lang})`);
+                    }
+                    
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    
+                    utterance.onend = onComplete;
+                    utterance.onerror = (e) => {
+                        console.error('Native TTS error, trying Google TTS:', e);
+                        speakWithGoogleTTS(text, langCode, onComplete);
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    // Use Google Translate TTS
+                    console.log(`Using Google TTS for voice guidance (${langCode})`);
+                    speakWithGoogleTTS(text, langCode, onComplete);
+                }
+            });
         }
 
         function showAssistanceSheet() {
@@ -3610,34 +3727,248 @@
             `;
         }
         
-        function speakResponse(text, callback) {
-            if ('speechSynthesis' in window) {
-                window.speechSynthesis.cancel();
-                
-                const utterance = new SpeechSynthesisUtterance(text);
-                utterance.lang = getVoiceLang();
-                utterance.rate = 0.9;
-                utterance.pitch = 1;
-                
-                updateVoiceUI('speaking');
-                document.getElementById('voice-transcript').textContent = text;
-                
-                utterance.onend = () => {
-                    if (voiceAssistantActive) {
-                        updateVoiceUI('idle');
-                    }
-                    if (callback) callback();
-                };
-                
-                utterance.onerror = () => {
-                    if (voiceAssistantActive) {
-                        updateVoiceUI('idle');
-                    }
-                };
-                
-                window.speechSynthesis.speak(utterance);
-                Haptics.notification();
+        // Get the best available voice for a language
+        function getBestVoice(langCode) {
+            const voices = window.speechSynthesis.getVoices();
+            if (voices.length === 0) return null;
+            
+            const langMap = {
+                'en': ['en-IN', 'en-GB', 'en-US', 'en'],
+                'hi': ['hi-IN', 'hi'],
+                'kn': ['kn-IN', 'kn'],
+                'ta': ['ta-IN', 'ta'],
+                'te': ['te-IN', 'te'],
+                'ml': ['ml-IN', 'ml']
+            };
+            
+            const preferredLangs = langMap[langCode] || langMap['en'];
+            
+            // Try to find a voice matching preferred languages
+            for (const lang of preferredLangs) {
+                const voice = voices.find(v => v.lang.startsWith(lang) || v.lang === lang);
+                if (voice) return voice;
             }
+            
+            // Try partial match
+            for (const lang of preferredLangs) {
+                const voice = voices.find(v => v.lang.toLowerCase().includes(lang.split('-')[0]));
+                if (voice) return voice;
+            }
+            
+            // Return null if no matching voice (will use Google TTS fallback)
+            return null;
+        }
+        
+        // Check if a language has native voice support
+        function hasNativeVoice(langCode) {
+            const voice = getBestVoice(langCode);
+            if (!voice) return false;
+            
+            // Check if the voice actually matches the language
+            const langMap = {
+                'en': ['en'],
+                'hi': ['hi'],
+                'kn': ['kn'],
+                'ta': ['ta'],
+                'te': ['te'],
+                'ml': ['ml']
+            };
+            
+            const prefixes = langMap[langCode] || ['en'];
+            return prefixes.some(prefix => voice.lang.toLowerCase().startsWith(prefix));
+        }
+        
+        // Use Google Translate TTS as fallback (works for all languages)
+        function speakWithGoogleTTS(text, langCode, callback) {
+            const langCodes = {
+                'en': 'en',
+                'hi': 'hi',
+                'kn': 'kn',
+                'ta': 'ta',
+                'te': 'te',
+                'ml': 'ml'
+            };
+            
+            const lang = langCodes[langCode] || 'en';
+            
+            // Split text into chunks (Google TTS has a limit of ~200 chars)
+            const chunks = splitTextIntoChunks(text, 180);
+            
+            let currentChunk = 0;
+            
+            function playNextChunk() {
+                if (currentChunk >= chunks.length) {
+                    if (callback) callback();
+                    return;
+                }
+                
+                const chunk = chunks[currentChunk];
+                const url = `https://translate.google.com/translate_tts?ie=UTF-8&tl=${lang}&client=tw-ob&q=${encodeURIComponent(chunk)}`;
+                
+                const audio = new Audio(url);
+                audio.playbackRate = 0.9;
+                
+                audio.onended = () => {
+                    currentChunk++;
+                    playNextChunk();
+                };
+                
+                audio.onerror = (e) => {
+                    console.error('Google TTS error:', e);
+                    currentChunk++;
+                    playNextChunk();
+                };
+                
+                audio.play().catch(err => {
+                    console.error('Audio play error:', err);
+                    // Try native TTS as last resort
+                    speakWithNativeTTS(chunk, langCode, () => {
+                        currentChunk++;
+                        playNextChunk();
+                    });
+                });
+            }
+            
+            playNextChunk();
+        }
+        
+        // Split text into smaller chunks for TTS
+        function splitTextIntoChunks(text, maxLength) {
+            const chunks = [];
+            const sentences = text.split(/(?<=[.!?।])\s+/);
+            let currentChunk = '';
+            
+            for (const sentence of sentences) {
+                if ((currentChunk + ' ' + sentence).length <= maxLength) {
+                    currentChunk = currentChunk ? currentChunk + ' ' + sentence : sentence;
+                } else {
+                    if (currentChunk) chunks.push(currentChunk);
+                    
+                    // If single sentence is too long, split by words
+                    if (sentence.length > maxLength) {
+                        const words = sentence.split(' ');
+                        currentChunk = '';
+                        for (const word of words) {
+                            if ((currentChunk + ' ' + word).length <= maxLength) {
+                                currentChunk = currentChunk ? currentChunk + ' ' + word : word;
+                            } else {
+                                if (currentChunk) chunks.push(currentChunk);
+                                currentChunk = word;
+                            }
+                        }
+                    } else {
+                        currentChunk = sentence;
+                    }
+                }
+            }
+            
+            if (currentChunk) chunks.push(currentChunk);
+            return chunks;
+        }
+        
+        // Speak using native Web Speech API
+        function speakWithNativeTTS(text, langCode, callback) {
+            const utterance = new SpeechSynthesisUtterance(text);
+            utterance.lang = getVoiceLang();
+            
+            const voice = getBestVoice(langCode);
+            if (voice) {
+                utterance.voice = voice;
+            }
+            
+            utterance.rate = 0.9;
+            utterance.pitch = 1;
+            
+            utterance.onend = () => {
+                if (callback) callback();
+            };
+            
+            utterance.onerror = () => {
+                if (callback) callback();
+            };
+            
+            window.speechSynthesis.speak(utterance);
+        }
+        
+        // Ensure voices are loaded
+        function ensureVoicesLoaded() {
+            return new Promise((resolve) => {
+                const voices = window.speechSynthesis.getVoices();
+                if (voices.length > 0) {
+                    resolve(voices);
+                    return;
+                }
+                
+                // Chrome loads voices asynchronously
+                window.speechSynthesis.onvoiceschanged = () => {
+                    resolve(window.speechSynthesis.getVoices());
+                };
+                
+                // Timeout fallback
+                setTimeout(() => resolve(window.speechSynthesis.getVoices()), 100);
+            });
+        }
+        
+        function speakResponse(text, callback) {
+            const langCode = state.currentLang;
+            
+            // Update UI
+            updateVoiceUI('speaking');
+            document.getElementById('voice-transcript').textContent = text;
+            Haptics.notification();
+            
+            // Language names for toast
+            const langNames = {
+                en: 'English',
+                hi: 'हिंदी',
+                kn: 'ಕನ್ನಡ',
+                ta: 'தமிழ்',
+                te: 'తెలుగు',
+                ml: 'മലയാളം'
+            };
+            
+            const onComplete = () => {
+                if (voiceAssistantActive) {
+                    updateVoiceUI('idle');
+                }
+                if (callback) callback();
+            };
+            
+            // Check if native voice is available for this language
+            ensureVoicesLoaded().then(() => {
+                const hasNative = hasNativeVoice(langCode);
+                
+                if (hasNative) {
+                    // Use native Web Speech API
+                    console.log(`Using native voice for ${langCode}`);
+                    
+                    const utterance = new SpeechSynthesisUtterance(text);
+                    utterance.lang = getVoiceLang();
+                    
+                    const voice = getBestVoice(langCode);
+                    if (voice) {
+                        utterance.voice = voice;
+                        console.log(`Voice: ${voice.name} (${voice.lang})`);
+                    }
+                    
+                    utterance.rate = 0.9;
+                    utterance.pitch = 1;
+                    
+                    utterance.onend = onComplete;
+                    utterance.onerror = (e) => {
+                        console.error('Native TTS error, trying Google TTS:', e);
+                        // Fallback to Google TTS
+                        speakWithGoogleTTS(text, langCode, onComplete);
+                    };
+                    
+                    window.speechSynthesis.speak(utterance);
+                } else {
+                    // Use Google Translate TTS for languages without native support
+                    console.log(`Using Google TTS for ${langCode} (no native voice)`);
+                    showToast(`🔊 Speaking in ${langNames[langCode]}...`, 'info');
+                    speakWithGoogleTTS(text, langCode, onComplete);
+                }
+            });
         }
         
         // ============================================
@@ -4244,6 +4575,12 @@
             registerServiceWorker();
             handleShortcuts();
             
+            // Preload speech synthesis voices
+            preloadVoices();
+            
+            // Update voice status after voices load
+            setTimeout(updateVoiceStatusInfo, 1000);
+            
             // Request notification permission after a delay
             setTimeout(requestNotificationPermission, 5000);
             
@@ -4256,7 +4593,111 @@
             if (isPWA()) {
                 console.log('Running as PWA');
             }
+            
+            updatePWAStatus();
         });
+        
+        // Preload and log available voices
+        function preloadVoices() {
+            if ('speechSynthesis' in window) {
+                // Force voice loading
+                window.speechSynthesis.getVoices();
+                
+                // Log voices when loaded
+                window.speechSynthesis.onvoiceschanged = () => {
+                    const voices = window.speechSynthesis.getVoices();
+                    console.log('Available voices:', voices.length);
+                    
+                    // Log Indian language voices
+                    const indianVoices = voices.filter(v => 
+                        v.lang.includes('IN') || 
+                        v.lang.startsWith('hi') || 
+                        v.lang.startsWith('kn') || 
+                        v.lang.startsWith('ta') || 
+                        v.lang.startsWith('te') || 
+                        v.lang.startsWith('ml')
+                    );
+                    
+                    if (indianVoices.length > 0) {
+                        console.log('Indian voices available:', indianVoices.map(v => `${v.name} (${v.lang})`));
+                    } else {
+                        console.log('No Indian language voices found. Using Google TTS fallback.');
+                    }
+                    
+                    // Update voice status in settings
+                    updateVoiceStatusInfo();
+                };
+            }
+        }
+        
+        // Update voice status information in settings
+        function updateVoiceStatusInfo() {
+            const container = document.getElementById('voice-status-info');
+            if (!container) return;
+            
+            const languages = [
+                { code: 'en', name: 'English', native: 'English' },
+                { code: 'hi', name: 'Hindi', native: 'हिंदी' },
+                { code: 'kn', name: 'Kannada', native: 'ಕನ್ನಡ' },
+                { code: 'ta', name: 'Tamil', native: 'தமிழ்' },
+                { code: 'te', name: 'Telugu', native: 'తెలుగు' },
+                { code: 'ml', name: 'Malayalam', native: 'മലയാളം' }
+            ];
+            
+            const html = languages.map(lang => {
+                const hasNative = hasNativeVoice(lang.code);
+                const voice = getBestVoice(lang.code);
+                
+                return `
+                    <div class="flex items-center justify-between p-2 rounded-lg ${lang.code === state.currentLang ? 'bg-yellow-500/20 border border-yellow-500/30' : 'bg-white/5'}">
+                        <div class="flex items-center gap-2">
+                            <span class="text-lg">${lang.code === state.currentLang ? '✓' : ''}</span>
+                            <span class="font-medium">${lang.native}</span>
+                        </div>
+                        <div class="flex items-center gap-2">
+                            ${hasNative 
+                                ? `<span class="text-green-400 text-xs">Native ✓</span>` 
+                                : `<span class="text-blue-400 text-xs">Google TTS</span>`
+                            }
+                        </div>
+                    </div>
+                `;
+            }).join('');
+            
+            container.innerHTML = html + `
+                <p class="text-xs text-gray-500 mt-2">
+                    ${hasNativeVoice(state.currentLang) 
+                        ? '✓ Your device has native voice for selected language' 
+                        : '🌐 Using Google Translate TTS (requires internet)'}
+                </p>
+            `;
+        }
+        
+        // Test voice function
+        function testVoice() {
+            Haptics.medium();
+            
+            const testMessages = {
+                en: "Hello! This is AccessiGo voice assistant. Your voice is working correctly.",
+                hi: "नमस्ते! यह एक्सेसीगो वॉयस असिस्टेंट है। आपकी आवाज़ सही काम कर रही है।",
+                kn: "ನಮಸ್ಕಾರ! ಇದು ಎಕ್ಸೆಸಿಗೋ ವಾಯ್ಸ್ ಅಸಿಸ್ಟೆಂಟ್. ನಿಮ್ಮ ಧ್ವನಿ ಸರಿಯಾಗಿ ಕಾರ್ಯನಿರ್ವಹಿಸುತ್ತಿದೆ.",
+                ta: "வணக்கம்! இது ஆக்செசிகோ குரல் உதவியாளர். உங்கள் குரல் சரியாக வேலை செய்கிறது.",
+                te: "నమస్కారం! ఇది యాక్సెసిగో వాయిస్ అసిస్టెంట్. మీ వాయిస్ సరిగ్గా పని చేస్తోంది.",
+                ml: "നമസ്കാരം! ഇത് ആക്സസിഗോ വോയ്സ് അസിസ്റ്റന്റ് ആണ്. നിങ്ങളുടെ ശബ്ദം ശരിയായി പ്രവർത്തിക്കുന്നു."
+            };
+            
+            const message = testMessages[state.currentLang] || testMessages.en;
+            speak(message);
+        }
+        
+        // Call voice status update when settings page is shown
+        const originalShowPage = showPage;
+        showPage = function(pageId) {
+            originalShowPage(pageId);
+            if (pageId === 'page-settings') {
+                setTimeout(updateVoiceStatusInfo, 100);
+            }
+        };
     </script>
 </body>
 </html>
